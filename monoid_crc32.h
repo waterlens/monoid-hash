@@ -10,9 +10,13 @@ static gf2p32_t ek_gf2p32_xtimes(gf2p32_t a) {
 }
 
 static gf2p32_t ek_gf2p32_mul(gf2p32_t a, gf2p32_t b) {
-  return b == 0 ? 0
-                : ek_gf2p32_add(ek_gf2p32_mul(ek_gf2p32_xtimes(a), b << 1),
-                                b & 0x80000000 ? a : 0);
+  gf2p32_t r = 0;
+  while (b) {
+    r = b & 0x80000000 ? ek_gf2p32_add(r, a) : r;
+    a = ek_gf2p32_xtimes(a);
+    b <<= 1;
+  }
+  return r;
 }
 
 static gf2p32_t ek_gf2p32_xpow(gf2p32_t a, uint32_t n) {
