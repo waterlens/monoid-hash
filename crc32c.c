@@ -2,6 +2,7 @@
 
 #include <arm_acle.h>
 #include <arm_neon.h>
+#include <stdint.h>
 
 CRC_AINLINE uint64x2_t clmul_lo_e(uint64x2_t a, uint64x2_t b, uint64x2_t c) {
   uint64x2_t r;
@@ -19,8 +20,8 @@ CRC_AINLINE uint64x2_t clmul_hi_e(uint64x2_t a, uint64x2_t b, uint64x2_t c) {
   return r;
 }
 
-CRC_EXPORT uint32_t crc32c(uint32_t crc0, const char *buf, size_t len) {
-  crc0 = ~crc0;
+CRC_EXPORT uint32_t crc32c(const char *buf, size_t len) {
+  uint32_t crc0 = 0;
   for (; len && ((uintptr_t)buf & 7); --len) {
     crc0 = __crc32cb(crc0, *buf++);
   }
@@ -115,5 +116,5 @@ CRC_EXPORT uint32_t crc32c(uint32_t crc0, const char *buf, size_t len) {
   for (; len; --len) {
     crc0 = __crc32cb(crc0, *buf++);
   }
-  return ~crc0;
+  return crc0;
 }
