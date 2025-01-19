@@ -3,10 +3,12 @@
 
 typedef uint32_t gf2p32_t;
 
+#define P 0xEDB88320
+
 static gf2p32_t ek_gf2p32_add(gf2p32_t a, gf2p32_t b) { return a ^ b; }
 
 static gf2p32_t ek_gf2p32_xtimes(gf2p32_t a) {
-  return ek_gf2p32_add(a >> 1, a & 1 ? 0xedb88320 : 0);
+  return ek_gf2p32_add(a >> 1, a & 1 ? P : 0);
 }
 
 static gf2p32_t ek_gf2p32_mul(gf2p32_t a, gf2p32_t b) {

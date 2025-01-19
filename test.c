@@ -4,6 +4,11 @@
 int main() {
   const char s[] = "123456789";
   ek_monoid_crc32_t c = ek_m_crc32_fold_bytes((void *)s, sizeof(s) - 1);
+  gf2p32_print_hex(c.p);
+  printf(" ");
+  gf2p32_print_hex(c.m);
+  puts("");
+  gf2p32_print_hex(ek_m_crc32_finalize(c));
   assert(c.p == 771566984);
   assert(c.m == 514856152);
   assert(ek_m_crc32_finalize(c) == 3421780262);
