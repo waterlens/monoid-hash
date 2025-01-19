@@ -11,7 +11,9 @@
 #define CRC_AINLINE static __inline __attribute__((always_inline))
 #define CRC_ALIGN(n) __attribute__((aligned(n)))
 #endif
+#ifndef CRC_EXPORT
 #define CRC_EXPORT extern
+#endif
 
 CRC_EXPORT uint32_t crc32c(const char *buf, size_t len);
 CRC_EXPORT uint32_t xnmodp(uint64_t n);
