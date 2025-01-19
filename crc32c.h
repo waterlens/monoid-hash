@@ -1,3 +1,6 @@
+#ifndef CRC32C_H
+#define CRC32C_H
+
 #include <stddef.h>
 #include <stdint.h>
 
@@ -48,3 +51,5 @@ CRC_AINLINE m_crc32c_t m_crc32c_fold_bytes(const char *data, size_t len) {
 CRC_AINLINE uint32_t m_crc32c_finalize(m_crc32c_t a) {
   return ~(a.p ^ gf2p32_mul(0xffffffff, a.m));
 }
+
+#endif
