@@ -1,56 +1,61 @@
-#include <stdio.h>
+#include "crc32c.h"
 #include <stdlib.h>
 
 typedef uint32_t gf2p32_t;
 
-#define P 0xEDB88320
+#define P 0xEDB88320ull
 
-static gf2p32_t ek_gf2p32_add(gf2p32_t a, gf2p32_t b) { return a ^ b; }
-
-static gf2p32_t ek_gf2p32_xtimes(gf2p32_t a) {
-  return ek_gf2p32_add(a >> 1, a & 1 ? P : 0);
+static gf2p32_t gf2p32_xtimes(gf2p32_t a) {
+  return (a >> 1) ^ ((0 - (a & 1)) & P);
 }
 
-static gf2p32_t ek_gf2p32_mul(gf2p32_t a, gf2p32_t b) {
+static gf2p32_t gf2p32_mul_ek(gf2p32_t a, gf2p32_t b) {
   gf2p32_t r = 0;
   while (b) {
-    r = b & 0x80000000 ? ek_gf2p32_add(r, a) : r;
-    a = ek_gf2p32_xtimes(a);
+    r ^= (0 - (b >> 31)) & a;
+    a = gf2p32_xtimes(a);
     b <<= 1;
   }
   return r;
 }
 
-static gf2p32_t ek_gf2p32_xpow(gf2p32_t a, uint32_t n) {
+static gf2p32_t gf2p32_mul(gf2p32_t a, gf2p32_t b) {
+  gf2p32_t r = 0;
+  for (int i = 0; i < 32; i++) {
+    r = gf2p32_xtimes(r);
+    r ^= (0 - (b & 1)) & a;
+    b >>= 1;
+  }
+  return r;
+}
+
+static gf2p32_t gf2p32_xpow(gf2p32_t a, uint32_t n) {
   if (n == 0)
     return 1;
 
   if (n == 1)
     return a;
 
-  div_t qr = div(n, 2);
-  gf2p32_t r = ek_gf2p32_xpow(a, qr.quot);
-  r = ek_gf2p32_mul(r, r);
-  if (qr.rem)
-    r = ek_gf2p32_xtimes(r);
+  gf2p32_t r = gf2p32_xpow(a, n >> 1);
+  r = gf2p32_mul(r, r);
+  if (n & 1)
+    r = gf2p32_xtimes(r);
+  n >>= 1;
   return r;
 }
 
-static const gf2p32_t ek_gf2p32_ones = 0xffffffff;
+static const gf2p32_t gf2p32_ones = 0xffffffff;
 
-static void gf2p32_print_hex(gf2p32_t x) { printf("%.8x", x); }
-static void gf2p32_print(gf2p32_t x) { printf("%.8u", x); }
-
-typedef struct ek_monoid_crc32_s {
+typedef struct monoid_crc32_s {
   gf2p32_t p;
   gf2p32_t m;
-} ek_monoid_crc32_t;
+} monoid_crc32_t;
 
-static ek_monoid_crc32_t ek_m_crc32_identity() {
-  return (ek_monoid_crc32_t){0, 0x80000000};
+static monoid_crc32_t m_crc32_identity() {
+  return (monoid_crc32_t){0, 0x80000000};
 }
 
-static const gf2p32_t ek_gf2p32_table[256] = {
+static const gf2p32_t gf2p32_table[256] = {
     0x00000000, 0x77073096, 0xee0e612c, 0x990951ba, 0x076dc419, 0x706af48f,
     0xe963a535, 0x9e6495a3, 0x0edb8832, 0x79dcb8a4, 0xe0d5e91e, 0x97d2d988,
     0x09b64c2b, 0x7eb17cbd, 0xe7b82d07, 0x90bf1d91, 0x1db71064, 0x6ab020f2,
@@ -96,32 +101,24 @@ static const gf2p32_t ek_gf2p32_table[256] = {
     0xb40bbe37, 0xc30c8ea1, 0x5a05df1b, 0x2d02ef8d,
 };
 
-static ek_monoid_crc32_t ek_m_crc32_byte(uint8_t a) {
-  return (ek_monoid_crc32_t){ek_gf2p32_table[a], ek_gf2p32_xpow(0x40000000, 8)};
+static monoid_crc32_t m_crc32_byte(uint8_t a) {
+  gf2p32_t x = a;
+  for (int i = 0; i < 8; i++)
+    x = gf2p32_xtimes(x);
+  return (monoid_crc32_t){x, gf2p32_xpow(0x40000000, 8)};
 }
 
-static ek_monoid_crc32_t ek_m_crc32_combine(ek_monoid_crc32_t a,
-                                            ek_monoid_crc32_t b) {
-  return (ek_monoid_crc32_t){ek_gf2p32_add(ek_gf2p32_mul(a.p, b.m), b.p),
-                             ek_gf2p32_mul(a.m, b.m)};
+static monoid_crc32_t m_crc32_combine(monoid_crc32_t a, monoid_crc32_t b) {
+  return (monoid_crc32_t){gf2p32_mul(a.p, b.m) ^ b.p, gf2p32_mul(a.m, b.m)};
 }
 
-static ek_monoid_crc32_t ek_m_crc32_fold_bytes(const uint8_t *data,
-                                               size_t len) {
-  ek_monoid_crc32_t r = ek_m_crc32_identity();
+static monoid_crc32_t m_crc32_fold_bytes(const uint8_t *data, size_t len) {
+  monoid_crc32_t r = m_crc32_identity();
   for (size_t i = 0; i < len; i++)
-    r = ek_m_crc32_combine(r, ek_m_crc32_byte(data[i]));
+    r = m_crc32_combine(r, m_crc32_byte(data[i]));
   return r;
 }
 
-static gf2p32_t ek_m_crc32_finalize(ek_monoid_crc32_t a) {
-  return ek_gf2p32_add(ek_gf2p32_ones,
-                       ek_gf2p32_add(a.p, ek_gf2p32_mul(ek_gf2p32_ones, a.m)));
-}
-
-static void ek_m_crc32_show(ek_monoid_crc32_t a) {
-  gf2p32_print(a.p);
-  printf(" ");
-  gf2p32_print(a.m);
-  puts("");
+static gf2p32_t m_crc32_finalize(monoid_crc32_t a) {
+  return ~(a.p ^ gf2p32_mul(gf2p32_ones, a.m));
 }

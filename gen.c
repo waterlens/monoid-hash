@@ -7,10 +7,8 @@ int main() {
     if (i % 8 == 0) {
       printf("  ");
     }
-    ek_monoid_crc32_t c = ek_m_crc32_byte(i);
-    printf("0x");
-    gf2p32_print_hex(c.p);
-    printf(", ");
+    monoid_crc32_t c = m_crc32_byte(i);
+    printf("0x%.8x,", c.p);
     if (i % 8 == 7) {
       printf("\n");
     }
