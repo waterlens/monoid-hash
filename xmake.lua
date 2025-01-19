@@ -9,7 +9,6 @@ end)
 
 target("monoid-hash", function ()
     set_kind("shared")
-    add_files("crc32c.c")
     add_cflags("-march=native")
 end)
 
