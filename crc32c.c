@@ -161,7 +161,7 @@ CRC_AINLINE __m128i clmul_scalar(uint32_t a, uint32_t b) {
   return _mm_clmulepi64_si128(_mm_cvtsi32_si128(a), _mm_cvtsi32_si128(b), 0);
 }
 
-static uint32_t xnmodp(uint64_t n) /* x^n mod P, in log(n) time */ {
+CRC_EXPORT uint32_t xnmodp(uint64_t n) /* x^n mod P, in log(n) time */ {
   uint64_t stack = ~(uint64_t)1;
   uint32_t acc, low;
   for (; n > 191; n = (n >> 1) - 16) {

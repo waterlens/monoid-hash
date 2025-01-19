@@ -10,6 +10,7 @@ end)
 target("monoid-hash", function ()
     set_kind("shared")
     add_files("crc32c.c")
+    add_cflags("-march=native")
 end)
 
 target("monoid-hash-test", function ()
@@ -17,6 +18,7 @@ target("monoid-hash-test", function ()
     add_deps("monoid-hash-headeronly")
     set_kind("binary")
     add_files("test.c")
+    add_cflags("-march=native")
 end)
 
 --
