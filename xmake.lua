@@ -7,13 +7,7 @@ target("monoid-hash-headeronly", function ()
     add_headerfiles("*.h")
 end)
 
-target("monoid-hash", function ()
-    set_kind("shared")
-    add_cflags("-march=native")
-end)
-
 target("monoid-hash-test", function ()
-    add_deps("monoid-hash")
     add_deps("monoid-hash-headeronly")
     set_kind("binary")
     add_files("test.c")

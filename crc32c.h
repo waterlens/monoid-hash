@@ -17,21 +17,7 @@
 
 CRC_EXPORT uint32_t crc32c(const char *buf, size_t len);
 CRC_EXPORT uint32_t xnmodp(uint64_t n);
-
-CRC_AINLINE uint32_t gf2p32_xtimes(uint32_t a) {
-  return (a >> 1) ^ ((0 - (a & 1)) & 0x82F63B78);
-}
-
-CRC_AINLINE uint32_t gf2p32_mul(uint32_t a, uint32_t b) {
-  uint32_t r = 0;
-  while (b) {
-    r ^= (0 - (b >> 31)) & a;
-    a = gf2p32_xtimes(a);
-    b <<= 1;
-  }
-  return r;
-}
-
+CRC_EXPORT uint32_t clmulr32(uint32_t a, uint32_t b);
 
 typedef struct m_crc32c_s {
   uint32_t p;
@@ -43,7 +29,7 @@ CRC_AINLINE m_crc32c_t m_crc32c_identity() {
 }
 
 static m_crc32c_t m_crc32c_combine(m_crc32c_t a, m_crc32c_t b) {
-  return (m_crc32c_t){gf2p32_mul(a.p, b.m) ^ b.p, gf2p32_mul(a.m, b.m)};
+  return (m_crc32c_t){clmulr32(a.p, b.m) ^ b.p, clmulr32(a.m, b.m)};
 }
 
 CRC_AINLINE m_crc32c_t m_crc32c_fold_bytes(const char *data, size_t len) {
@@ -51,7 +37,7 @@ CRC_AINLINE m_crc32c_t m_crc32c_fold_bytes(const char *data, size_t len) {
 }
 
 CRC_AINLINE uint32_t m_crc32c_finalize(m_crc32c_t a) {
-  return ~(a.p ^ gf2p32_mul(0xffffffff, a.m));
+  return ~(a.p ^ clmulr32(0xffffffff, a.m));
 }
 
 #if defined(__aarch64__) && (__ARM_ARCH == 8) && defined(__ARM_FEATURE_CRC32)
@@ -63,6 +49,12 @@ CRC_AINLINE uint32_t m_crc32c_finalize(m_crc32c_t a) {
 #include <arm_acle.h>
 #include <arm_neon.h>
 #include <stdint.h>
+
+CRC_AINLINE uint64x2_t clmul_lo(uint64x2_t a, uint64x2_t b) {
+  uint64x2_t r;
+  __asm("pmull %0.1q, %1.1d, %2.1d\n" : "=w"(r) : "w"(a), "w"(b));
+  return r;
+}
 
 CRC_AINLINE uint64x2_t clmul_lo_e(uint64x2_t a, uint64x2_t b, uint64x2_t c) {
   uint64x2_t r;
@@ -80,6 +72,35 @@ CRC_AINLINE uint64x2_t clmul_hi_e(uint64x2_t a, uint64x2_t b, uint64x2_t c) {
   return r;
 }
 
+CRC_EXPORT
+uint32_t clmulr32(uint32_t a, uint32_t b) {
+  uint64x2_t aa = vdupq_n_u64(a), bb = vdupq_n_u64(b);
+  uint64x2_t j = vshlq_u64(clmul_lo(aa, bb), vdupq_n_s64(1));
+  uint64x2_t k;
+  {
+    static const uint64_t __attribute__((aligned(16))) k_[] = {
+        0x90d3d871bd4e27e2ull,
+    };
+    k = vld1q_dup_u64(k_);
+  }
+  uint64x2_t l = clmul_lo(j, k);
+  {
+    static const uint64_t __attribute__((aligned(16))) k_[] = {
+        0xfffffffe00000000ull, (uint64_t)-1ll};
+    k = vld1q_u64(k_);
+  }
+  uint64x2_t n = vandq_u64(l, k);
+  {
+    static const uint64_t
+        __attribute__((aligned(16))) k_[] = {0x82f63b7880000000ull};
+    k = vld1q_dup_u64(k_);
+  }
+  uint64x2_t hi = clmul_lo(n, k);
+  uint64x2_t shl = vextq_u64(hi, vdupq_n_u64(0), 1);
+  uint64x2_t r = clmul_hi_e(n, k, shl);
+  return (uint32_t)vgetq_lane_u64(r, 0);
+}
+
 CRC_EXPORT uint32_t xnmodp(uint64_t n) /* x^n mod P, in log(n) time */ {
   uint64_t stack = ~(uint64_t)1;
   uint32_t acc, low;
@@ -92,9 +113,12 @@ CRC_EXPORT uint32_t xnmodp(uint64_t n) /* x^n mod P, in log(n) time */ {
     acc = __crc32cw(acc, 0);
   }
   while ((low = stack & 1), stack >>= 1) {
-    uint64x2_t x = vsetq_lane_s32(acc, vdupq_n_s32(0), 0);
-    uint64_t y = vgetq_lane_u64(
-        vreinterpretq_u64_p128(vmull_p64(vget_low_u64(x), vget_low_u64(x))), 0);
+    uint64x2_t x =
+        vreinterpretq_u64_s32(vsetq_lane_s32(acc, vdupq_n_s32(0), 0));
+    uint64_t y =
+        vgetq_lane_u64(vreinterpretq_u64_p128(vmull_p64(vgetq_lane_u64(x, 0),
+                                                        vgetq_lane_u64(x, 0))),
+                       0);
     acc = __crc32cd(0, y << low);
   }
   return acc;
@@ -341,6 +365,5 @@ CRC_EXPORT uint32_t crc32c(const char *buf, size_t len) {
 }
 
 #endif
-
 
 #endif
