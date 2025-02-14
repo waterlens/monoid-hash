@@ -251,7 +251,7 @@ uint32_t clmulr32(uint32_t a, uint32_t b) {
   __m128i n = _mm_and_si128(l, k);
   k = _mm_set1_epi64x(0x82f63b7880000000ull);
   __m128i hi = clmul_lo(n, k);
-  __m128i shl = _mm_slli_si128(hi, 8);
+  __m128i shl = _mm_srli_si128(hi, 8);
   __m128i r = clmul_hi(n, k);
   return _mm_extract_epi32(_mm_xor_si128(r, shl), 0);
 }
