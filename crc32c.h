@@ -78,21 +78,20 @@ uint32_t clmulr32(uint32_t a, uint32_t b) {
   uint64x2_t j = vshlq_u64(clmul_lo(aa, bb), vdupq_n_s64(1));
   uint64x2_t k;
   {
-    static const uint64_t __attribute__((aligned(16))) k_[] = {
+    static const uint64_t CRC_ALIGN(16) k_[] = {
         0x90d3d871bd4e27e2ull,
     };
     k = vld1q_dup_u64(k_);
   }
   uint64x2_t l = clmul_lo(j, k);
   {
-    static const uint64_t __attribute__((aligned(16))) k_[] = {
-        0xfffffffe00000000ull, (uint64_t)-1ll};
+    static const uint64_t CRC_ALIGN(16)
+        k_[] = {0xfffffffe00000000ull, (uint64_t)-1ll};
     k = vld1q_u64(k_);
   }
   uint64x2_t n = vandq_u64(l, k);
   {
-    static const uint64_t
-        __attribute__((aligned(16))) k_[] = {0x82f63b7880000000ull};
+    static const uint64_t CRC_ALIGN(16) k_[] = {0x82f63b7880000000ull};
     k = vld1q_dup_u64(k_);
   }
   uint64x2_t hi = clmul_lo(n, k);
@@ -237,6 +236,24 @@ CRC_EXPORT uint32_t crc32c(const char *buf, size_t len) {
 
 CRC_AINLINE __m128i clmul_scalar(uint32_t a, uint32_t b) {
   return _mm_clmulepi64_si128(_mm_cvtsi32_si128(a), _mm_cvtsi32_si128(b), 0);
+}
+
+CRC_EXPORT
+uint32_t clmulr32(uint32_t a, uint32_t b) {
+  __m128i aa = _mm_cvtsi32_si128(a), bb = _mm_cvtsi32_si128(b);
+  __m128i j = _mm_slli_epi64(clmul_lo(aa, bb), 1);
+  __m128i k;
+  k = _mm_cvtsi64_si128(0x90d3d871bd4e27e2ull);
+  __m128i l = clmul_lo(j, k);
+  static const uint64_t CRC_ALIGN(16)
+      k_[] = {0xfffffffe00000000ull, (uint64_t)-1ll};
+  k = _mm_load_si128((const __m128i *)k_);
+  __m128i n = _mm_and_si128(l, k);
+  k = _mm_set1_epi64x(0x82f63b7880000000ull);
+  __m128i hi = clmul_lo(n, k);
+  __m128i shl = _mm_slli_si128(hi, 8);
+  __m128i r = clmul_hi(n, k);
+  return _mm_extract_epi32(_mm_xor_si128(r, shl), 0);
 }
 
 CRC_EXPORT uint32_t xnmodp(uint64_t n) /* x^n mod P, in log(n) time */ {
