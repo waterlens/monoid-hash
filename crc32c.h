@@ -114,10 +114,7 @@ CRC_EXPORT uint32_t xnmodp(uint64_t n) /* x^n mod P, in log(n) time */ {
   while ((low = stack & 1), stack >>= 1) {
     uint64x2_t x =
         vreinterpretq_u64_s32(vsetq_lane_s32(acc, vdupq_n_s32(0), 0));
-    uint64_t y =
-        vgetq_lane_u64(vreinterpretq_u64_p128(vmull_p64(vgetq_lane_u64(x, 0),
-                                                        vgetq_lane_u64(x, 0))),
-                       0);
+    uint64_t y = vgetq_lane_u64((clmul_lo(x, x)), 0);
     acc = __crc32cd(0, y << low);
   }
   return acc;
